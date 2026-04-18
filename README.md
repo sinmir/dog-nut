@@ -61,25 +61,17 @@ Download the files you like, rename them to the four names above, and drop them 
 | > 1500 (frantic)        | +2     | up to ~80%  |
 
 - **Mood (♥♥♥♥♥)** rises with good pets, falls with bad pets. High mood adds a points bonus; low mood makes bites more likely.
-- **Stop petting for 3 seconds** → dog image swaps to the growling variant and a growl loops (warning).
-- **Stop petting for 6 seconds** → the dog bites. Keep your hand moving.
+- **Stop petting for 1.5 seconds** → dog image swaps to the growling variant and a growl loops (warning).
+- **Stop petting for 4 seconds** → the dog bites. Keep your hand moving — this puppy is impatient.
 - **Resume petting during warning** → growl stops instantly and the dog image snaps back to happy.
 
 A **wagging tail** appears while you're petting.
 
 Best score is saved in localStorage.
 
-## Calibrating tail position
+## Tail position
 
-Since every dog photo is framed differently, the game ships with a default tail position that probably won't match your image. To fix this:
-
-1. Tap the **⚙** button in the top bar.
-2. A draggable **🌀 tail** pill appears on the dog.
-3. Drag it onto your dog's tail (the tail follows live).
-4. Tap **Save**. Position persists in localStorage.
-5. **Reset** returns to default; **Cancel** discards unsaved changes.
-
-Re-calibrate anytime (e.g., after swapping `dog.jpg`).
+The wagging tail is positioned for the current `dog.jpg` (puppy lying on its side, rump in the upper-right). If you swap in a different image, tweak the `--tail-x` / `--tail-y` custom properties at the top of the `#tail` CSS rule in `index.html` — they're normalized `0–1` coordinates of the dog container.
 
 ## Tuning
 

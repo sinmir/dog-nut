@@ -68,8 +68,9 @@
     box-shadow: 0 8px 24px rgba(0,0,0,0.35);
     cursor: grab;
     transition: transform 150ms ease, box-shadow 200ms ease, filter 400ms ease;
-    overflow: hidden;
     position: relative;
+    /* overflow: visible — let the tail extend above the card.
+       The dog image itself is clipped via its own border-radius. */
   }
   .dog-wrap:active { cursor: grabbing; }
   .dog-wrap.pet-pulse { transform: scale(1.03); }
@@ -86,6 +87,7 @@
   .dog-img {
     width: 100%; height: 100%;
     object-fit: cover;
+    border-radius: 24px;     /* clip the image to the card corners */
     pointer-events: none;
     -webkit-user-drag: none;
     user-select: none;
@@ -140,87 +142,36 @@
     font-size: 12px;
   }
 
-  /* ───── Tail + Sad overlays ───── */
-  .overlay {
-    position: absolute;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-    transition: opacity 300ms ease;
-  }
+  /* ───── Tail — sticks up from top-center of the dog image box ───── */
   #tail {
-    left: calc(var(--tail-x, 0.80) * 100%);
-    top:  calc(var(--tail-y, 0.65) * 100%);
-    width: 80px; height: 80px;
-    color: var(--accent);
+    position: absolute;
+    top: 0;
+    left: 50%;
+    /* bottom-center of the tail box sits at the top edge of the image box,
+       so the tail extends upward out of the card */
+    transform: translate(-50%, -100%);
+    width: 18%; aspect-ratio: 1;
+    color: #d4ad7a;
     opacity: 0;
+    transition: opacity 250ms ease;
+    pointer-events: none;
+    z-index: 3;
   }
-  .dog-wrap.petting #tail { opacity: 1; }
+  body.petting #tail { opacity: 1; }
   .tail-inner {
     width: 100%; height: 100%;
-    transform-origin: 50% 100%;   /* pivot at bottom-center of box */
+    transform-origin: 50% 100%;         /* pivot at tail base (bottom) */
   }
-  .dog-wrap.petting .tail-inner {
+  body.petting .tail-inner {
     animation: wag 350ms ease-in-out infinite;
   }
-  /* Freeze the tail during calibration so it's easy to position */
-  .dog-wrap.calibrating #tail { opacity: 1; }
-  .dog-wrap.calibrating .tail-inner { animation: none; }
-  /* Hide overlays when game-over, unless calibrating */
-  .dog-wrap.game-over:not(.calibrating) #tail { opacity: 0; }
-  .dog-wrap.game-over:not(.calibrating) .tail-inner { animation: none; }
-  .tail-svg, .tail-img { width: 100%; height: 100%; display: block; }
-  .tail-img { object-fit: contain; }
+  .tail-svg { width: 100%; height: 100%; display: block; }
+  .tail-img { width: 100%; height: 100%; object-fit: contain; }
+  .tail-img[hidden] { display: none; }
   @keyframes wag {
     0%, 100% { transform: rotate(-30deg); }
     50%      { transform: rotate( 30deg); }
   }
-
-  /* ───── Calibration mode ───── */
-  #calib-btn {
-    background: transparent; border: 1px solid #3a3d47; color: var(--text);
-    border-radius: 6px; padding: 6px 10px; font-size: 16px; cursor: pointer;
-  }
-  #calib-btn:active, #calib-btn.active { background: var(--accent); color: #1b1d24; border-color: var(--accent); }
-
-  .dog-wrap.calibrating { cursor: default; }
-  .dog-wrap.calibrating .dog-img { filter: brightness(0.75); }
-
-  .calib-marker {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    background: rgba(255, 209, 102, 0.96); color: #1b1d24;
-    border: 2px solid #1b1d24; border-radius: 999px;
-    padding: 10px 14px; font-weight: 700; font-size: 13px;
-    touch-action: none; cursor: grab;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    z-index: 5;
-    white-space: nowrap;
-    pointer-events: auto;
-  }
-  .calib-marker:active { cursor: grabbing; }
-  #calib-tail { left: calc(var(--tail-x, 0.80) * 100%); top: calc(var(--tail-y, 0.65) * 100%); }
-
-  #calib-bar {
-    position: fixed; left: 0; right: 0; bottom: 0;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0));
-    background: var(--panel); border-top: 1px solid #333640;
-    display: none; gap: 8px; justify-content: center; z-index: 20;
-  }
-  #calib-bar.visible { display: flex; }
-  #calib-bar button {
-    padding: 10px 18px; border-radius: 8px; font-weight: 700;
-    font-size: 15px; border: none; cursor: pointer;
-  }
-  #calib-bar .save { background: var(--good); color: #1b1d24; }
-  #calib-bar .reset { background: #3a3d47; color: var(--text); }
-  #calib-bar .cancel { background: var(--bad); color: #1b1d24; }
-
-  #calib-hint {
-    position: fixed; left: 0; right: 0; top: 68px;
-    text-align: center; font-size: 13px; color: var(--muted);
-    display: none; z-index: 20; padding: 0 16px;
-  }
-  #calib-hint.visible { display: block; }
 </style>
 </head>
 <body>
@@ -229,7 +180,6 @@
     <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
     <div class="stat"><span class="label">Mood</span><span class="value" id="mood">♥♥♥♥♥</span></div>
     <button id="mute" aria-label="Toggle sound">🔊</button>
-    <button id="calib-btn" aria-label="Calibrate tail and face positions">⚙</button>
   </header>
 
   <main>
@@ -237,27 +187,17 @@
       <img id="dog" class="dog-img" src="assets/dog.jpg" alt="dog">
       <img id="dog-bite-preload" src="assets/dog-bite.jpg" hidden>
       <img id="dog-growl-preload" src="assets/dog-growl.jpg" hidden>
-
-      <div class="overlay" id="tail">
+      <div id="tail">
         <div class="tail-inner">
           <img class="tail-img" src="assets/tail.png" alt="" hidden>
           <svg class="tail-svg" viewBox="0 0 60 60" aria-hidden="true">
-            <path d="M30,60 Q30,25 55,8" stroke="currentColor" stroke-width="10"
+            <path d="M30,60 Q22,30 38,8" stroke="currentColor" stroke-width="12"
                   stroke-linecap="round" fill="none"/>
           </svg>
         </div>
       </div>
-
-      <div class="calib-marker" id="calib-tail" hidden>🌀 tail</div>
     </div>
   </main>
-
-  <div id="calib-hint">Drag the marker onto your dog's tail, then Save.</div>
-  <div id="calib-bar">
-    <button class="reset" id="calib-reset">Reset</button>
-    <button class="cancel" id="calib-cancel">Cancel</button>
-    <button class="save" id="calib-save">Save</button>
-  </div>
 
   <div id="feedback">Press and drag across the dog to pet.</div>
 
@@ -288,8 +228,8 @@ const MOOD_START = 50;
 const MOOD_MIN = 0, MOOD_MAX = 100;
 const PEAK_FRANTIC = 2000;
 const BITE_MOOD_FACTOR = 1.5;
-const IDLE_WARN_MS = 3000;
-const IDLE_BITE_MS = 6000;
+const IDLE_WARN_MS = 1500;
+const IDLE_BITE_MS = 4000;
 const PET_LOOP_FADE_MS = 250;
 const PET_LOOP_GRACE_MS = 600;
 const PET_LOOP_VOLUME = 0.4;
@@ -297,7 +237,6 @@ const BITE_VOLUME = 0.85;
 const BITE_HOLD_MS = 1800; // how long the bite image lingers before the score overlay
 const TAIL_GRACE_MS = 600;               // keep tail wagging this long after last stroke
 const GROWL_VOLUME = 0.7;                // volume for idle growl loop
-const CALIB_DEFAULTS = { tailX: 0.80, tailY: 0.65 };
 
 // ──────────────────────────── Elements ────────────────────────────
 const dogWrap = document.getElementById("dog-wrap");
@@ -321,13 +260,6 @@ const tailPngEl = tailEl.querySelector(".tail-img");
 const tailSvgEl = tailEl.querySelector(".tail-svg");
 const dogGrowlPreload = document.getElementById("dog-growl-preload");
 const growlSfxEl = document.getElementById("growl-sfx");
-const calibBtn = document.getElementById("calib-btn");
-const calibTailMarker = document.getElementById("calib-tail");
-const calibBar = document.getElementById("calib-bar");
-const calibHint = document.getElementById("calib-hint");
-const calibSaveBtn = document.getElementById("calib-save");
-const calibCancelBtn = document.getElementById("calib-cancel");
-const calibResetBtn = document.getElementById("calib-reset");
 
 // ──────────────────────────── Asset fallbacks ────────────────────
 function useEmojiFallback(imgEl, emoji) {
@@ -448,32 +380,16 @@ function hardStopGrowl() {
   growlSfxEl.currentTime = 0;
 }
 
-// ──────────────────────────── Calibration ──────────────────────
-function loadCalibration() {
-  try {
-    const raw = JSON.parse(localStorage.getItem("dogNut.calib"));
-    if (raw && typeof raw === "object") return { ...CALIB_DEFAULTS, ...raw };
-  } catch {}
-  return { ...CALIB_DEFAULTS };
-}
-function applyCalibration(c) {
-  const s = document.documentElement.style;
-  s.setProperty("--tail-x", c.tailX);
-  s.setProperty("--tail-y", c.tailY);
-}
-let calib = loadCalibration();
-applyCalibration(calib);
-
 // ──────────────────────────── Tail wiring ───────────────────────
 let pettingStopTimer = null;
 function startPettingVisual() {
   clearTimeout(pettingStopTimer); pettingStopTimer = null;
-  dogWrap.classList.add("petting");
+  document.body.classList.add("petting");
 }
 function schedulePettingStop() {
   clearTimeout(pettingStopTimer);
   pettingStopTimer = setTimeout(() => {
-    dogWrap.classList.remove("petting");
+    document.body.classList.remove("petting");
     pettingStopTimer = null;
   }, TAIL_GRACE_MS);
 }
@@ -508,7 +424,6 @@ function exitWarning() {
 
 // ──────────────────────────── Game state ────────────────────────
 let state = "playing"; // "playing" | "over"
-let calibrating = false;
 let score = 0;
 let best = +localStorage.getItem("dogNut.best") || 0;
 let mood = MOOD_START;
@@ -603,7 +518,7 @@ function finalizeStroke(t) {
 
 // ──────────────────────────── Pointer handlers ─────────────────
 dogWrap.addEventListener("pointerdown", (e) => {
-  if (state !== "playing" || calibrating) return;
+  if (state !== "playing") return;
   e.preventDefault();
   dogWrap.setPointerCapture(e.pointerId);
   const rect = dogWrap.getBoundingClientRect();
@@ -632,7 +547,7 @@ dogWrap.addEventListener("pointerleave", (e) => {
 
 // ──────────────────────────── Idle monitor ─────────────────────
 const idleTimer = setInterval(() => {
-  if (state !== "playing" || strokeActive || calibrating) return;
+  if (state !== "playing" || strokeActive) return;
   const idle = performance.now() - lastStrokeEndedAt;
   if (idle > IDLE_BITE_MS) {
     triggerBite("You stopped petting. The dog is offended!");
@@ -660,7 +575,7 @@ function triggerBite(reason) {
   setDogImage("bite");
 
   clearTimeout(pettingStopTimer); pettingStopTimer = null;
-  dogWrap.classList.remove("petting");
+  document.body.classList.remove("petting");
   dogWrap.classList.add("game-over");
   dogWrap.classList.add("shake");
   setTimeout(() => dogWrap.classList.remove("shake"), 450);
@@ -686,85 +601,12 @@ playAgainBtn.addEventListener("click", () => {
   isWarning = false;
   hardStopGrowl();
   setDogImage("happy");
-  dogWrap.classList.remove("game-over", "petting");
+  dogWrap.classList.remove("game-over");
+  document.body.classList.remove("petting");
   renderStats();
   setFeedback("Press and drag across the dog to pet.", null);
 });
 
-// ──────────────────────────── Calibration mode ─────────────────
-let preCalibSnapshot = null;
-
-function enterCalibration() {
-  if (calibrating) return;
-  calibrating = true;
-  preCalibSnapshot = { ...calib };
-  dogWrap.classList.add("calibrating");
-  dogWrap.classList.add("petting"); // show tail live
-  calibTailMarker.hidden = false;
-  calibBar.classList.add("visible");
-  calibHint.classList.add("visible");
-  calibBtn.classList.add("active");
-  hardStopPetLoop();
-  hardStopGrowl();
-}
-function exitCalibration() {
-  if (!calibrating) return;
-  calibrating = false;
-  dogWrap.classList.remove("calibrating");
-  dogWrap.classList.remove("petting");
-  calibTailMarker.hidden = true;
-  calibBar.classList.remove("visible");
-  calibHint.classList.remove("visible");
-  calibBtn.classList.remove("active");
-  preCalibSnapshot = null;
-  // Reset idle timer so player isn't instantly bitten after calibration
-  lastStrokeEndedAt = performance.now();
-}
-
-function setupMarkerDrag(markerEl, xKey, yKey, xVar, yVar) {
-  let dragging = false;
-  markerEl.addEventListener("pointerdown", (e) => {
-    e.stopPropagation(); e.preventDefault();
-    dragging = true;
-    markerEl.setPointerCapture(e.pointerId);
-  });
-  markerEl.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    e.preventDefault();
-    const rect = dogWrap.getBoundingClientRect();
-    const nx = Math.max(-0.1, Math.min(1.1, (e.clientX - rect.left) / rect.width));
-    const ny = Math.max(-0.1, Math.min(1.1, (e.clientY - rect.top) / rect.height));
-    calib[xKey] = nx;
-    calib[yKey] = ny;
-    document.documentElement.style.setProperty(xVar, nx);
-    document.documentElement.style.setProperty(yVar, ny);
-  }, { passive: false });
-  const end = (e) => {
-    if (!dragging) return;
-    dragging = false;
-    try { markerEl.releasePointerCapture(e.pointerId); } catch {}
-  };
-  markerEl.addEventListener("pointerup", end);
-  markerEl.addEventListener("pointercancel", end);
-}
-setupMarkerDrag(calibTailMarker, "tailX", "tailY", "--tail-x", "--tail-y");
-
-calibBtn.addEventListener("click", () => {
-  if (calibrating) exitCalibration();
-  else enterCalibration();
-});
-calibSaveBtn.addEventListener("click", () => {
-  localStorage.setItem("dogNut.calib", JSON.stringify(calib));
-  exitCalibration();
-});
-calibCancelBtn.addEventListener("click", () => {
-  if (preCalibSnapshot) { calib = { ...preCalibSnapshot }; applyCalibration(calib); }
-  exitCalibration();
-});
-calibResetBtn.addEventListener("click", () => {
-  calib = { ...CALIB_DEFAULTS };
-  applyCalibration(calib);
-});
 </script>
 </body>
 </html>
