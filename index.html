@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pet the Dog</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b1d24">
+<style>
+  :root {
+    --bg: #1b1d24;
+    --panel: #24272f;
+    --text: #ececf1;
+    --muted: #8b8f9a;
+    --accent: #ffd166;
+    --good: #78e08f;
+    --bad: #ff6b6b;
+    --warn: #ffb347;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex; flex-direction: column;
+    height: 100dvh;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid #333640;
+    gap: 12px;
+  }
+  .stat { display: flex; flex-direction: column; line-height: 1.1; }
+  .stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat .value { font-size: 20px; font-weight: 700; }
+  #mood {
+    display: flex; gap: 2px; font-size: 18px; color: var(--bad);
+  }
+  #mute {
+    background: transparent; border: 1px solid #3a3d47; color: var(--text);
+    border-radius: 6px; padding: 6px 10px; font-size: 16px; cursor: pointer;
+  }
+  #mute:active { background: #2e3139; }
+
+  main {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+
+  .dog-wrap {
+    touch-action: none;
+    width: min(80vw, 420px);
+    aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 24px;
+    background: var(--panel);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    cursor: grab;
+    transition: transform 150ms ease, box-shadow 200ms ease, filter 400ms ease;
+    overflow: hidden;
+    position: relative;
+  }
+  .dog-wrap:active { cursor: grabbing; }
+  .dog-wrap.idle-warn { filter: grayscale(0.5) brightness(0.85); }
+  .dog-wrap.pet-pulse { transform: scale(1.03); }
+  .dog-wrap.bad-pulse { box-shadow: 0 0 0 4px var(--bad), 0 8px 24px rgba(0,0,0,0.35); }
+  .dog-wrap.shake { animation: shake 400ms ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-14px) rotate(-3deg); }
+    30% { transform: translateX(12px) rotate(3deg); }
+    45% { transform: translateX(-10px) rotate(-2deg); }
+    60% { transform: translateX(8px) rotate(2deg); }
+    80% { transform: translateX(-4px); }
+  }
+  .dog-img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+  .dog-emoji {
+    font-size: clamp(120px, 40vw, 260px);
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  #feedback {
+    min-height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600;
+    padding: 8px 16px;
+    text-align: center;
+    color: var(--muted);
+  }
+  #feedback.good { color: var(--good); }
+  #feedback.bad { color: var(--bad); }
+  #feedback.warn { color: var(--warn); }
+
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,11,15,0.85);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+  #overlay.visible { display: flex; opacity: 1; }
+  #overlay h1 { margin: 0; font-size: 42px; color: var(--bad); letter-spacing: 0.05em; }
+  #overlay p { margin: 0; color: var(--muted); text-align: center; max-width: 80vw; }
+  #overlay .final-score { font-size: 32px; color: var(--accent); font-weight: 700; }
+  #overlay .best { font-size: 14px; color: var(--muted); }
+  #overlay button {
+    margin-top: 8px;
+    background: var(--accent); color: #1b1d24;
+    border: none; border-radius: 10px;
+    padding: 14px 28px; font-size: 18px; font-weight: 700;
+    cursor: pointer;
+  }
+  #overlay button:active { transform: translateY(1px); }
+
+  .hidden { display: none !important; }
+
+  footer {
+    padding: 8px 16px 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="stat"><span class="label">Score</span><span class="value" id="score">0</span></div>
+    <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
+    <div class="stat"><span class="label">Mood</span><span class="value" id="mood">♥♥♥♥♥</span></div>
+    <button id="mute" aria-label="Toggle sound">🔊</button>
+  </header>
+
+  <main>
+    <div id="dog-wrap" class="dog-wrap" aria-label="Pet the dog. Press and drag across the dog.">
+      <img id="dog" class="dog-img" src="assets/dog.jpg" alt="dog">
+      <img id="dog-bite-preload" src="assets/dog-bite.jpg" hidden>
+    </div>
+  </main>
+
+  <div id="feedback">Press and drag across the dog to pet.</div>
+
+  <footer>Drag slow = boring. Drag medium = happy dog. Drag fast or stop petting = bite!</footer>
+
+  <div id="overlay" role="dialog" aria-modal="true">
+    <h1 id="overlay-title">BITTEN!</h1>
+    <p id="overlay-reason"></p>
+    <div class="final-score">Score: <span id="final-score">0</span></div>
+    <div class="best">Best: <span id="overlay-best">0</span></div>
+    <button id="play-again">Play Again</button>
+  </div>
+
+  <audio id="pet-loop" src="assets/pet-loop.mp3" loop preload="auto"></audio>
+  <audio id="bite-sfx" src="assets/bite.mp3" preload="auto"></audio>
+
+<script>
+// ──────────────────────────── Tunables ────────────────────────────
+const SPEED_BANDS = [
+  { max: 100,      points: 1,  bite: 0.00, label: "too slow",      tone: "warn" },
+  { max: 300,      points: 3,  bite: 0.00, label: "gentle pet",    tone: "good" },
+  { max: 800,      points: 10, bite: 0.00, label: "nice pet!",     tone: "good" },
+  { max: 1500,     points: 6,  bite: 0.10, label: "a bit fast",    tone: "warn" },
+  { max: Infinity, points: 2,  bite: 0.55, label: "TOO FAST!",     tone: "bad"  },
+];
+const MOOD_START = 50;
+const MOOD_MIN = 0, MOOD_MAX = 100;
+const PEAK_FRANTIC = 2000;
+const BITE_MOOD_FACTOR = 1.5;
+const IDLE_WARN_MS = 3000;
+const IDLE_BITE_MS = 6000;
+const PET_LOOP_FADE_MS = 250;
+const PET_LOOP_GRACE_MS = 600;
+const PET_LOOP_VOLUME = 0.4;
+const BITE_VOLUME = 0.85;
+const BITE_HOLD_MS = 1800; // how long the bite image lingers before the score overlay
+
+// ──────────────────────────── Elements ────────────────────────────
+const dogWrap = document.getElementById("dog-wrap");
+const dogImg = document.getElementById("dog");
+const dogBitePreload = document.getElementById("dog-bite-preload");
+const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best");
+const moodEl = document.getElementById("mood");
+const feedbackEl = document.getElementById("feedback");
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlay-title");
+const overlayReason = document.getElementById("overlay-reason");
+const finalScoreEl = document.getElementById("final-score");
+const overlayBestEl = document.getElementById("overlay-best");
+const playAgainBtn = document.getElementById("play-again");
+const muteBtn = document.getElementById("mute");
+const petLoopEl = document.getElementById("pet-loop");
+const biteSfxEl = document.getElementById("bite-sfx");
+
+// ──────────────────────────── Asset fallbacks ────────────────────
+function useEmojiFallback(imgEl, emoji) {
+  const span = document.createElement("div");
+  span.className = "dog-emoji";
+  span.textContent = emoji;
+  imgEl.replaceWith(span);
+  return span;
+}
+let dogEl = dogImg;
+const dogBiteSrc = dogBitePreload.src;
+const dogHappySrc = dogImg.src;
+let dogBiteAvailable = true;
+let dogHappyAvailable = true;
+
+function markHappyMissing() {
+  if (!dogHappyAvailable) return;
+  dogHappyAvailable = false;
+  dogEl = useEmojiFallback(dogImg, "🐕");
+}
+function markBiteMissing() { dogBiteAvailable = false; }
+
+dogImg.addEventListener("error", markHappyMissing, { once: true });
+dogBitePreload.addEventListener("error", markBiteMissing, { once: true });
+// Handle the race where error already fired before this script ran.
+if (dogImg.complete && dogImg.naturalWidth === 0) markHappyMissing();
+if (dogBitePreload.complete && dogBitePreload.naturalWidth === 0) markBiteMissing();
+
+// ──────────────────────────── Audio ────────────────────────────
+let audioEnabled = { pet: true, bite: true };
+let muted = localStorage.getItem("dogNut.muted") === "1";
+petLoopEl.volume = PET_LOOP_VOLUME;
+biteSfxEl.volume = BITE_VOLUME;
+petLoopEl.addEventListener("error", () => { audioEnabled.pet = false; }, { once: true });
+biteSfxEl.addEventListener("error", () => { audioEnabled.bite = false; }, { once: true });
+// If the error event already fired before this script ran:
+if (petLoopEl.error) audioEnabled.pet = false;
+if (biteSfxEl.error) audioEnabled.bite = false;
+
+function updateMuteButton() {
+  muteBtn.textContent = muted ? "🔇" : "🔊";
+  petLoopEl.muted = muted;
+  biteSfxEl.muted = muted;
+}
+muteBtn.addEventListener("click", () => {
+  muted = !muted;
+  localStorage.setItem("dogNut.muted", muted ? "1" : "0");
+  updateMuteButton();
+});
+updateMuteButton();
+
+let petLoopFadeTimer = null;
+let petLoopStopTimer = null;
+function startPetLoop() {
+  if (!audioEnabled.pet || muted) return;
+  clearTimeout(petLoopStopTimer); petLoopStopTimer = null;
+  if (petLoopFadeTimer) { clearInterval(petLoopFadeTimer); petLoopFadeTimer = null; }
+  petLoopEl.volume = PET_LOOP_VOLUME;
+  if (petLoopEl.paused) petLoopEl.play().catch(() => {});
+}
+function scheduleStopPetLoop() {
+  if (!audioEnabled.pet) return;
+  clearTimeout(petLoopStopTimer);
+  petLoopStopTimer = setTimeout(() => {
+    const step = 50;
+    const fadeSteps = Math.max(1, Math.floor(PET_LOOP_FADE_MS / step));
+    const delta = PET_LOOP_VOLUME / fadeSteps;
+    petLoopFadeTimer = setInterval(() => {
+      petLoopEl.volume = Math.max(0, petLoopEl.volume - delta);
+      if (petLoopEl.volume <= 0.01) {
+        clearInterval(petLoopFadeTimer); petLoopFadeTimer = null;
+        petLoopEl.pause();
+        petLoopEl.currentTime = 0;
+        petLoopEl.volume = PET_LOOP_VOLUME;
+      }
+    }, step);
+  }, PET_LOOP_GRACE_MS);
+}
+function hardStopPetLoop() {
+  clearTimeout(petLoopStopTimer); petLoopStopTimer = null;
+  if (petLoopFadeTimer) { clearInterval(petLoopFadeTimer); petLoopFadeTimer = null; }
+  petLoopEl.pause();
+  petLoopEl.currentTime = 0;
+  petLoopEl.volume = PET_LOOP_VOLUME;
+}
+function playBiteSfx() {
+  if (!audioEnabled.bite || muted) return;
+  biteSfxEl.currentTime = 0;
+  biteSfxEl.play().catch(() => {});
+}
+
+// ──────────────────────────── Game state ────────────────────────
+let state = "playing"; // "playing" | "over"
+let score = 0;
+let best = +localStorage.getItem("dogNut.best") || 0;
+let mood = MOOD_START;
+let lastStrokeEndedAt = performance.now();
+
+function renderStats() {
+  scoreEl.textContent = score;
+  bestEl.textContent = best;
+  const hearts = Math.max(0, Math.round(mood / 20));
+  moodEl.textContent = "♥".repeat(hearts) + "♡".repeat(5 - hearts);
+  moodEl.style.color = mood >= 60 ? "var(--good)" : mood >= 30 ? "var(--warn)" : "var(--bad)";
+}
+renderStats();
+
+function setFeedback(text, tone) {
+  feedbackEl.textContent = text;
+  feedbackEl.className = "";
+  if (tone) feedbackEl.classList.add(tone);
+}
+
+function flashPulse(className) {
+  dogWrap.classList.add(className);
+  setTimeout(() => dogWrap.classList.remove(className), 180);
+}
+
+// ──────────────────────────── Stroke tracking ───────────────────
+let strokeActive = false;
+let strokeStartedAt = 0;
+let strokeDistance = 0;
+let strokePeakSpeed = 0;
+let lastSamplePos = null;
+let lastSampleTime = 0;
+
+function resetStroke(x, y, t) {
+  strokeActive = true;
+  strokeStartedAt = t;
+  strokeDistance = 0;
+  strokePeakSpeed = 0;
+  lastSamplePos = { x, y };
+  lastSampleTime = t;
+}
+
+function sampleMove(x, y, t) {
+  if (!strokeActive || !lastSamplePos) return;
+  const dx = x - lastSamplePos.x;
+  const dy = y - lastSamplePos.y;
+  const d = Math.hypot(dx, dy);
+  const dt = Math.max(1, t - lastSampleTime);
+  strokeDistance += d;
+  const inst = (d / dt) * 1000; // px/sec
+  if (inst > strokePeakSpeed) strokePeakSpeed = inst;
+  lastSamplePos = { x, y };
+  lastSampleTime = t;
+}
+
+function finalizeStroke(t) {
+  if (!strokeActive) return;
+  strokeActive = false;
+  lastStrokeEndedAt = t;
+  const duration = Math.max(1, t - strokeStartedAt);
+  const avgSpeed = (strokeDistance / duration) * 1000; // px/sec
+
+  let band = SPEED_BANDS.find(b => avgSpeed < b.max);
+  if (strokePeakSpeed > PEAK_FRANTIC) band = SPEED_BANDS[SPEED_BANDS.length - 1];
+
+  const moodBonus = band.points >= 10 ? Math.floor(mood / 20) : 0;
+  const gained = band.points + moodBonus;
+  score += gained;
+
+  if (band.tone === "good") {
+    mood = Math.min(MOOD_MAX, mood + 5);
+    flashPulse("pet-pulse");
+  } else if (band.tone === "bad") {
+    mood = Math.max(MOOD_MIN, mood - 10);
+    flashPulse("bad-pulse");
+  } else if (band.tone === "warn" && avgSpeed < 100) {
+    mood = Math.max(MOOD_MIN, mood - 2);
+  }
+
+  const moodMultiplier = 1 + (BITE_MOOD_FACTOR - 1) * ((MOOD_MAX - mood) / MOOD_MAX);
+  const biteChance = band.bite * moodMultiplier;
+
+  setFeedback(`${band.label}  +${gained}${moodBonus ? ` (mood +${moodBonus})` : ""}`, band.tone);
+  renderStats();
+  scheduleStopPetLoop();
+
+  if (Math.random() < biteChance) {
+    triggerBite(avgSpeed > 1500 ? "You were too rough. The dog bit you!" : "The dog got annoyed and bit you!");
+  }
+}
+
+// ──────────────────────────── Pointer handlers ─────────────────
+dogWrap.addEventListener("pointerdown", (e) => {
+  if (state !== "playing") return;
+  e.preventDefault();
+  dogWrap.setPointerCapture(e.pointerId);
+  const rect = dogWrap.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  resetStroke(x, y, performance.now());
+  startPetLoop();
+  dogWrap.classList.remove("idle-warn");
+});
+dogWrap.addEventListener("pointermove", (e) => {
+  if (state !== "playing" || !strokeActive) return;
+  e.preventDefault();
+  const rect = dogWrap.getBoundingClientRect();
+  sampleMove(e.clientX - rect.left, e.clientY - rect.top, performance.now());
+}, { passive: false });
+function endStroke(e) {
+  if (!strokeActive) return;
+  try { dogWrap.releasePointerCapture(e.pointerId); } catch {}
+  finalizeStroke(performance.now());
+}
+dogWrap.addEventListener("pointerup", endStroke);
+dogWrap.addEventListener("pointercancel", endStroke);
+dogWrap.addEventListener("pointerleave", (e) => {
+  // pointer capture keeps us tracking; only end on real up/cancel
+});
+
+// ──────────────────────────── Idle monitor ─────────────────────
+const idleTimer = setInterval(() => {
+  if (state !== "playing" || strokeActive) return;
+  const idle = performance.now() - lastStrokeEndedAt;
+  if (idle > IDLE_BITE_MS) {
+    triggerBite("You stopped petting. The dog is offended!");
+    return;
+  }
+  if (idle > IDLE_WARN_MS) {
+    dogWrap.classList.add("idle-warn");
+    if (mood > MOOD_MIN) {
+      mood = Math.max(MOOD_MIN, mood - 1);
+      renderStats();
+    }
+    setFeedback("Keep petting — the dog is waiting…", "warn");
+  }
+}, 250);
+
+// ──────────────────────────── Bite / game over ─────────────────
+function triggerBite(reason) {
+  if (state !== "playing") return;
+  state = "over";
+  strokeActive = false;
+  hardStopPetLoop();
+  playBiteSfx();
+
+  if (dogBiteAvailable && dogHappyAvailable && dogEl.tagName === "IMG") {
+    dogEl.src = dogBiteSrc;
+  } else if (!dogHappyAvailable) {
+    dogEl.textContent = "😠";
+  } else {
+    // happy img exists but bite img missing → leave happy image, shake only
+  }
+
+  dogWrap.classList.remove("idle-warn");
+  dogWrap.classList.add("shake");
+  setTimeout(() => dogWrap.classList.remove("shake"), 450);
+
+  if (score > best) {
+    best = score;
+    localStorage.setItem("dogNut.best", String(best));
+  }
+  setTimeout(() => {
+    overlayReason.textContent = reason;
+    finalScoreEl.textContent = score;
+    overlayBestEl.textContent = best;
+    overlay.classList.add("visible");
+  }, BITE_HOLD_MS);
+}
+
+playAgainBtn.addEventListener("click", () => {
+  overlay.classList.remove("visible");
+  state = "playing";
+  score = 0;
+  mood = MOOD_START;
+  lastStrokeEndedAt = performance.now();
+  if (dogEl.tagName === "IMG" && dogHappyAvailable) {
+    dogEl.src = dogHappySrc;
+  } else if (!dogHappyAvailable) {
+    dogEl.textContent = "🐕";
+  }
+  dogWrap.classList.remove("idle-warn");
+  renderStats();
+  setFeedback("Press and drag across the dog to pet.", null);
+});
+</script>
+</body>
+</html>
